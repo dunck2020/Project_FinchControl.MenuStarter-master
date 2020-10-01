@@ -16,7 +16,7 @@ namespace Project_FinchControl
     // Author: Dunckel, John
     // Dated Created: 9/30/2020
     // Last Modified: 9/30/2020
-    //
+    // 
     // **************************************************
 
     class Program
