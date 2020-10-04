@@ -11,16 +11,17 @@ namespace Project_FinchControl
     //
     // Title: Finch Control
     // Description: This program will make the Finch
-    // robot perform based on user input             
+    // robot perform based on user input.             
     // Application Type: Console
     // Author: Dunckel, John
     // Dated Created: 9/30/2020
-    // Last Modified: 9/30/2020
+    // Last Modified: 10/01/2020
     // 
     // **************************************************
 
     class Program
     {
+     
         /// <summary>
         /// first method run when the app starts up
         /// </summary>
@@ -33,92 +34,7 @@ namespace Project_FinchControl
             DisplayClosingScreen();
         }
 
-        /// <summary>
-        /// setup the console theme
-        /// </summary>
-        static void SetTheme()
-        {
-            Console.ForegroundColor = ConsoleColor.DarkGreen;
-            Console.BackgroundColor = ConsoleColor.Gray;
-        }
 
-        /// <summary>
-        /// *****************************************************************
-        /// *                     Main Menu                                 *
-        /// *****************************************************************
-        /// </summary>
-        static void DisplayMenuScreen()
-        {
-            Console.CursorVisible = true;
-
-            bool quitApplication = false;
-            string menuChoice;
-
-            Finch myFinch = new Finch();
-
-            do
-            {
-                DisplayScreenHeader("Main Menu");
-
-                //
-                // get user menu choice
-                //
-                Console.WriteLine("\ta) Connect Finch Robot");
-                Console.WriteLine("\tb) Talent Show");
-                Console.WriteLine("\tc) Data Recorder");
-                Console.WriteLine("\td) Alarm System");
-                Console.WriteLine("\te) User Programming");
-                Console.WriteLine("\tf) Disconnect Finch Robot");
-                Console.WriteLine("\tq) Quit");
-                Console.Write("\t\tEnter Choice:");
-                menuChoice = Console.ReadLine().ToLower();
-
-                //
-                // process user menu choice
-                //
-                switch (menuChoice)
-                {
-                    case "a":
-                        DisplayConnectFinchRobot(myFinch);
-                        break;
-
-                    case "b":
-                        DisplayTalentShowMenuScreen(myFinch);
-                        break;
-
-                    case "c":
-                        DisplayUnderDevelopment();
-                        DisplayContinuePrompt();
-                        break;
-
-                    case "d":
-                        DisplayUnderDevelopment();
-                        DisplayContinuePrompt();
-                        break;
-
-                    case "e":
-                        DisplayUnderDevelopment();
-                        DisplayContinuePrompt();
-                        break;
-
-                    case "f":
-                        DisplayDisconnectFinchRobot(myFinch);
-                        break;
-
-                    case "q":
-                        DisplayDisconnectFinchRobot(myFinch);
-                        quitApplication = true;
-                        break;
-
-                    default:
-                        Console.WriteLine();
-                        Console.WriteLine("\tPlease enter a letter for the menu choice.");
-                        DisplayContinuePrompt();
-                        break;
-                }
-
-            } while (!quitApplication);
-        }
 
         #region TALENT SHOW
 
@@ -144,6 +60,7 @@ namespace Project_FinchControl
                 Console.WriteLine("\ta) Light and Sound");
                 Console.WriteLine("\tb) Dance");
                 Console.WriteLine("\tc) Mixing it up");
+                Console.WriteLine("\td) Play Match the Frequency");
                 Console.WriteLine("\tq) Main Menu");
                 Console.Write("\t\tEnter Choice:");
                 menuChoice = Console.ReadLine().ToLower();
@@ -164,7 +81,9 @@ namespace Project_FinchControl
                     case "c":
                         DisplayMixItUp(myFinch);
                         break;
-
+                    case "d":
+                        GuessFrequency(myFinch);
+                        break;
                     case "q":
                         quitTalentShowMenu = true;
                         break;
@@ -199,6 +118,7 @@ namespace Project_FinchControl
                 myFinch.setLED(lightSoundLevel, lightSoundLevel, lightSoundLevel);
                 myFinch.noteOn(lightSoundLevel * 100);
             }
+            myFinch.setLED(0, 0, 0);
 
             DisplayMenuPrompt("Talent Show Menu");
         }
@@ -256,10 +176,10 @@ namespace Project_FinchControl
             myFinch.setMotors(100, 100);
             myFinch.wait(2000);
             myFinch.setMotors(0, 0);
-
+            DisplayFinchFinale(myFinch);
             DisplayMenuPrompt("Talent Show Menu");
         }
-
+   
         /// <summary>
         /// *****************************************************************
         /// *               Talent Show > Mix It Up                         *
@@ -275,10 +195,10 @@ namespace Project_FinchControl
             Console.WriteLine("\tThe Finch robot will now mix it up!");
             DisplayContinuePrompt();
             DisplayScreenHeader("Finch will perform 'For Elise' (by Beethoven). Also moving to the music and showing off the LED technology.");
-;
+     
             int counter = 1;
             do
-            {
+            {   //finch will perform sound, LED action, and movement
                 counter++;
                 myFinch.noteOn(1318);
                 myFinch.setLED(150, 150, 150);
@@ -294,7 +214,7 @@ namespace Project_FinchControl
                 myFinch.wait(300);
 
                 myFinch.noteOn(1244);
-                myFinch.setLED(100,100, 1000);
+                myFinch.setLED(100, 100, 1000);
                 myFinch.setMotors(150, 20);
                 myFinch.wait(300);
 
@@ -364,15 +284,97 @@ namespace Project_FinchControl
             //turn of the Finch robots talents 
             //
             myFinch.noteOff();
-            myFinch.setMotors(0,0);
-            myFinch.setLED(0, 0, 0);
+            myFinch.setMotors(0, 0);
+
+            DisplayFinchFinale(myFinch);
 
             DisplayMenuPrompt("Talent Show Menu");
+        }
+
+        /// <summary>
+        /// *****************************************************************
+        /// *               Talent Show > Guess Frequency                   *
+        /// *****************************************************************
+        /// </summary>
+        /// <param name="myFinch"></param>
+        static void GuessFrequency(Finch myFinch)
+        {
+            //
+            //finch will emith a frequency and user tries to guess
+            //
+            DisplayScreenHeader("Guess the frequency the Finch Robot emits");
+            Console.WriteLine();
+            Console.WriteLine("\t\tListen close!");
+            DisplayContinuePrompt();
+            myFinch.noteOn(880);
+            myFinch.wait(500);
+            myFinch.noteOff();
+   
+            bool menuResponse = false;
+            do
+            {
+                //
+                // get user response
+                //
+                Console.WriteLine("\tGuess what frequency you just heard:");
+                Console.WriteLine("\ta) 880");
+                Console.WriteLine("\tb) 987");
+                Console.WriteLine("\tc) 1046");
+                Console.WriteLine("\td) Listen again?");
+                Console.Write("\t\tEnter Choice:");
+                string userResponse = Console.ReadLine().ToLower();
+
+                //
+                //process user reponse
+                //
+                switch (userResponse)
+                {
+                    case "a":
+                        Console.WriteLine("Terrific! You guessed correctly");
+                        DisplayContinuePrompt();
+                        menuResponse = true;
+                        break;
+                    case "b":
+                        Console.WriteLine("Sorry, you guessed incorrectly, try again.");
+                        DisplayContinuePrompt();
+                        break;
+                    case "c":
+                        Console.WriteLine("Sorry, you guessed incorrectly, try again.");
+                        DisplayContinuePrompt();
+                        break;
+                    case "d":
+                        myFinch.noteOn(880);
+                        myFinch.wait(500);
+                        myFinch.noteOff();
+                        DisplayContinuePrompt();
+                        break;
+                    default:
+                        Console.WriteLine();
+                        Console.WriteLine("\tPlease enter a letter from the menu choice.");
+                        DisplayContinuePrompt();
+                        break;
+                }
+            } while (!menuResponse);
+        }
+
+        /// <summary>
+        /// This is the finale
+        /// </summary>
+        /// <param name="myFinch"></param>
+        static void DisplayFinchFinale(Finch myFinch)
+        {
+
+            for (int lights = 0; lights < 255; lights += 5)
+                myFinch.setLED(lights - 10, lights - 50, lights);
+            for (int lights = 255; lights > 0; lights -= 5)
+                myFinch.setLED(lights - 10, lights - 50, lights);
+            myFinch.setLED(0, 0, 0);
         }
 
         #endregion
 
         #region FINCH ROBOT MANAGEMENT
+
 
         /// <summary>
         /// *****************************************************************
@@ -385,24 +387,15 @@ namespace Project_FinchControl
 
             Console.CursorVisible = false;
 
-            bool robotConnected;
-
             DisplayScreenHeader("Disconnect Finch Robot");
 
             Console.WriteLine("\tAbout to disconnect from the Finch robot.");
+
             DisplayContinuePrompt();
 
-            robotConnected = myFinch.connect();
+            myFinch.disConnect();
 
-            if (robotConnected)
-            { 
-                myFinch.disConnect();
-                Console.WriteLine("\tThe Finch robot is disconnected.");
-            }
-            else
-            {
-                Console.WriteLine("\tThe Finch robot is already disconnected.");
-            }
+            Console.WriteLine("\tThe Finch robot is disconnected.");
 
             DisplayMenuPrompt("Main Menu");
         }
@@ -419,31 +412,97 @@ namespace Project_FinchControl
             Console.CursorVisible = false;
 
             bool robotConnected;
+            do
+            {   //
+                //loop to process until user has connection or opts out
+                //
+                DisplayScreenHeader("Connect Finch Robot");
+                Console.WriteLine("\tAbout to connect to Finch robot. Please be sure the USB cable is connected to the robot and computer now.");
+                DisplayContinuePrompt();
+                robotConnected = myFinch.connect();
+                //
+                //statement to determine if Finch robot connected 
+                //
+                if (robotConnected)
+                    SuccessfulConnection(myFinch);
+                else if (!robotConnected)
+                    //
+                    //Finch did not connect time to verify 
+                    //
+                    robotConnected = VerifyFinchConnected(robotConnected);
+                
+            } while (!robotConnected) ;
 
-            DisplayScreenHeader("Connect Finch Robot");
-
-            Console.WriteLine("\tAbout to connect to Finch robot. Please be sure the USB cable is connected to the robot and computer now.");
-
-            DisplayContinuePrompt();
-
-            robotConnected = myFinch.connect();
-
-            // TODO test connection and provide user feedback - text, lights, sounds
-
-            DisplayMenuPrompt("Main Menu");
-
-            //
             // reset finch robot
-            //
             myFinch.setLED(0, 0, 0);
             myFinch.noteOff();
 
             return robotConnected;
         }
 
+        /// <summary>
+        ///  Method verifies the user has connected the usb cable
+        /// </summary>
+        static bool VerifyFinchConnected(bool connectedRobot)
+        {
+            //
+            //no connection get response from user
+            //
+            DisplayScreenHeader("Could not connect");
+            Console.WriteLine("\tFinch did not connect, please verify USB is connected");
+            Console.WriteLine("\tDo you want to try to connect again?");
+            Console.WriteLine("\tY) To Try Again:");
+            Console.WriteLine("\tN) Return to the Main Menu:");
+            Console.Write("\t\tEnter Choice:");
+            string userResponse = Console.ReadLine().ToLower();
+            switch (userResponse)
+            {
+                case "y"://user is trying again connectRobot remains false
+                    connectedRobot = false;
+                    break;
+                case "n"://user has opted out of trying to connect
+                    connectedRobot = true;
+                    break;
+                default:
+                    Console.WriteLine();
+                    Console.WriteLine("\tPlease enter y or n.");
+                    DisplayContinuePrompt();
+                    break;
+            }
+            return connectedRobot;
+        }
+
+        /// <summary>
+        /// Displays light and sound for a connection to Finch
+        /// </summary>
+        /// <param name="myFinch"></param>
+        static void SuccessfulConnection(Finch myFinch)
+        {   //
+            //successful let user know with lights, sound and message
+            //
+            for (int lightSoundLevel = 0; lightSoundLevel < 255; lightSoundLevel+= 10)
+            {
+                myFinch.setLED(lightSoundLevel, lightSoundLevel, lightSoundLevel);
+                myFinch.noteOn(lightSoundLevel * 100);
+
+            }
+            myFinch.setLED(0, 0, 0);
+            DisplayScreenHeader("Successful Connection!");
+            DisplayContinuePrompt();
+        }
+
         #endregion
 
         #region USER INTERFACE
+
+        /// <summary>
+        /// setup the console theme
+        /// </summary>
+        static void SetTheme()
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGreen;
+            Console.BackgroundColor = ConsoleColor.Gray;
+        }
 
         /// <summary>
         /// *****************************************************************
@@ -462,6 +521,81 @@ namespace Project_FinchControl
             Console.WriteLine();
 
             DisplayContinuePrompt();
+        }
+
+        /// <summary>
+        /// *****************************************************************
+        /// *                     Main Menu                                 *
+        /// *****************************************************************
+        /// </summary>
+        static void DisplayMenuScreen()
+        {
+            Console.CursorVisible = true;
+
+            bool quitApplication = false;
+            string menuChoice;
+
+            Finch myFinch = new Finch();
+
+            do
+            {
+                DisplayScreenHeader("Main Menu");
+
+                //
+                // get user menu choice
+                //
+                Console.WriteLine("\ta) Connect Finch Robot");
+                Console.WriteLine("\tb) Talent Show");
+                Console.WriteLine("\tc) Data Recorder");
+                Console.WriteLine("\td) Alarm System");
+                Console.WriteLine("\te) User Programming");
+                Console.WriteLine("\tf) Disconnect Finch Robot");
+                Console.WriteLine("\tq) Quit");
+                Console.Write("\t\tEnter Choice:");
+                menuChoice = Console.ReadLine().ToLower();
+
+                //
+                // process user menu choice
+                //
+                switch (menuChoice)
+                {
+                    case "a":
+                        DisplayConnectFinchRobot(myFinch);
+                        break;
+
+                    case "b":
+                        DisplayTalentShowMenuScreen(myFinch);
+                        break;
+
+                    case "c":
+                        DisplayUnderDevelopment();
+                        break;
+
+                    case "d":
+                        DisplayUnderDevelopment();
+                        break;
+
+                    case "e":
+                        DisplayUnderDevelopment();
+                        break;
+
+                    case "f":
+                        DisplayDisconnectFinchRobot(myFinch);
+                        break;
+
+                    case "q":
+                        DisplayDisconnectFinchRobot(myFinch);
+                        quitApplication = true;
+                        break;
+
+                    default:
+                        Console.WriteLine();
+                        Console.WriteLine("\tPlease enter a letter for the menu choice.");
+                        DisplayContinuePrompt();
+                        break;
+                }
+
+            } while (!quitApplication);
         }
 
         /// <summary>
@@ -511,6 +645,7 @@ namespace Project_FinchControl
             Console.WriteLine("\t\t" + headerText);
             Console.WriteLine();
         }
+
         /// <summary>
         /// display notification these modules are in development
         /// </summary>
@@ -518,8 +653,8 @@ namespace Project_FinchControl
         {
             Console.WriteLine();
             Console.WriteLine("\tThis module is currently in development.");
+            DisplayContinuePrompt();
         }
-
     }
 }
         #endregion
