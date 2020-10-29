@@ -1,12 +1,34 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Xml.Schema;
 using FinchAPI;
 
 namespace Project_FinchControl
 {
+    /// <summary>
+    /// User Commands
+    /// </summary>
+    
+    public enum Command
+    {
+        NONE,
+        MOVEFORWARD,
+        MOVEBACKWARD,
+        STOPMOTORS,
+        WAIT,
+        TURNRIGHT,
+        TURNLEFT,
+        LEDON,
+        LEDOFF,
+        NOTEON,
+        NOTEOFF,
+        GETTEMPERATURE,
+        DONE
+    }
 
     // **************************************************
     //
@@ -16,7 +38,7 @@ namespace Project_FinchControl
     // Application Type: Console
     // Author: Dunckel, John
     // Dated Created: 9/30/2020
-    // Last Modified: 10/18/2020
+    // Last Modified: 10/27/2020
     // 
     // **************************************************
 
@@ -36,6 +58,522 @@ namespace Project_FinchControl
         }
 
 
+        #region USER PROGRAMMING
+
+        /// <summary>
+        /// Diplay main user programming menu
+        /// </summary>
+        /// <param name="myFinch"></param>
+        private static void UserProgrammingDisplayMenuScreen(Finch myFinch)
+        {
+            Console.CursorVisible = true;
+            string menuChoice;
+            bool quitMenu = false;
+
+            //store command parameters in a tuple
+            (int motorSpeed, int ledRedBrightness, int ledGreenBrightness, int ledBlueBrightness, int frequency, double waitSeconds) commandParameters;
+            commandParameters.motorSpeed = 0;
+            commandParameters.ledRedBrightness = 0;
+            commandParameters.ledGreenBrightness = 0;
+            commandParameters.ledBlueBrightness = 0;
+            commandParameters.frequency = 0;
+            commandParameters.waitSeconds = 0;
+
+            //declare a list storing defined enum commands
+            List<Command> commands = new List<Command>();
+
+            //---------------------------
+            //main user programming menu
+            //---------------------------
+            bool parametersEntered = false;
+            bool commandsEntered = false;
+
+            do
+            {
+                DisplayScreenHeader("User Programming");
+
+                // prompt user for menu choice
+                Console.WriteLine("\ta) Set Command Parameters");
+                Console.WriteLine("\tb) Add Commands");
+                Console.WriteLine("\tc) View Commands");
+                Console.WriteLine("\td) Execute Commands");
+                Console.WriteLine("\te) Clear Commands");
+                Console.WriteLine("\tq) Exit to Main Menu");
+                Console.Write("\t\tEnter Choice:");
+                menuChoice = Console.ReadLine().ToLower();
+
+                // process user menu choice
+                switch (menuChoice)
+                {
+                    case "a":
+                        //get the command parameters from the user
+                        commandParameters = UserProgrammingDisplayGetCommandParameters();
+                        parametersEntered = true;
+                        break;
+
+                    case "b":
+                        //get commands from user
+                        UserProgrammingDisplayGetFinchCommands(commands);
+                        commandsEntered = true;
+                        break;
+
+                    case "c":
+                        //displays a list of commands entered by user
+                        if (commandsEntered)
+                        {
+                            UserProgrammingDisplayFinchCommands(commands);
+                        }
+                        //alerts user if no commands entered
+                        else
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("\tNo commands entered.");
+                            DisplayContinuePrompt();
+                        }              
+                        break;
+
+                    case "d":
+                        //executes commands if both params and commands entered
+                        if (commandsEntered && parametersEntered)
+                        {
+                            UserProgrammingDisplayExecuteFinchCommands(
+                                myFinch,
+                                commands,
+                                commandParameters);
+                        }
+
+                        //alerts user no commands are entered
+                        else if (!commandsEntered)
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("\tNo commands entered.");
+                            DisplayContinuePrompt();
+                        }
+
+                        //alerts user no parameters are entered
+                        else if (!parametersEntered)
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("\tNo parameters entered.");
+                            DisplayContinuePrompt();
+                        }
+
+                        break;
+
+                    case "e":
+                        //resets the list so the user can reprogram
+                        if (commandsEntered)
+                        {
+                            commandsEntered = UserProgrammingDisplayClearFinchCommandsList(commands);
+                        }
+
+                        //alerts user no commands entered
+                        else if (!commandsEntered)
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("\tNo commands entered.");
+                            DisplayContinuePrompt();
+                        }
+                        break;
+
+                    case "q":
+                        //exits to main menu
+                        quitMenu = true;
+                        break;
+
+                    default:
+                        //user has entered a non valid item
+                        Console.WriteLine();
+                        Console.WriteLine("\tPlease enter a letter from the menu choice.");
+                        DisplayContinuePrompt();
+                        break;
+                }
+
+            } while (!quitMenu);
+
+        }
+
+        /// <summary>
+        /// method to clear the list of commands
+        /// </summary>
+        /// <param name="commands"></param>
+        static bool UserProgrammingDisplayClearFinchCommandsList(List<Command> commands)
+        {
+            bool commandsEntered = true;
+            DisplayScreenHeader("Clear Commands");
+            Console.Write("\tDo you wish to clear commands? (Y or N):");
+            string userResponse = Console.ReadLine().ToLower();
+
+            //option to verify user wants to clear commands
+            switch (userResponse)
+            {
+                case "y":
+                    commands.Clear();
+                    Console.WriteLine();
+                    Console.WriteLine("\tUser commands have been cleared");
+                    commandsEntered = false;
+                    break;
+                default:
+                    Console.WriteLine();
+                    Console.WriteLine("\tCommands not cleared");
+                    break;
+            }
+            DisplayContinuePrompt();
+            return commandsEntered;
+        }
+
+        /// <summary>
+        /// execute list of commads input from user
+        /// </summary>
+        /// <param name="myFinch"></param>
+        /// <param name="commands"></param>
+        /// <param name="commandParameters"></param>
+        static void UserProgrammingDisplayExecuteFinchCommands(
+            Finch myFinch, 
+            List<Command> commands, 
+            (int motorSpeed, 
+            int ledRedBrightness, 
+            int ledGreenBrightness, 
+            int ledBlueBrightness,
+            int frequency,
+            double waitSeconds) commandParameters)
+        {
+            int motorSpeed = commandParameters.motorSpeed;
+            int ledRedBrightness = commandParameters.ledRedBrightness;
+            int ledGreenBrightness = commandParameters.ledGreenBrightness;
+            int ledBlueBrightness = commandParameters.ledBlueBrightness;
+            int frequency = commandParameters.frequency;
+            int waitMilliSeconds = (int) (commandParameters.waitSeconds * 1000);
+            string commandFeedBack = "";
+            const int TURNING_MOTOR_SPEED = 100;
+
+            DisplayScreenHeader("Execute Commands");
+
+            Console.WriteLine("\tThe Finch Robot is ready to execute the command list.");
+            DisplayContinuePrompt();
+
+            foreach (Command command in commands)
+            {
+                
+                switch (command)
+                {
+                    case Command.NONE:
+                        break;
+
+                    case Command.MOVEFORWARD:
+                        myFinch.setMotors(motorSpeed, motorSpeed);
+                        commandFeedBack = Command.MOVEFORWARD.ToString();
+                        break;
+
+                    case Command.MOVEBACKWARD:
+                        myFinch.setMotors(-motorSpeed, -motorSpeed);
+                        commandFeedBack = Command.MOVEBACKWARD.ToString();
+                        break;
+
+                    case Command.STOPMOTORS:
+                        myFinch.setMotors(0, 0);
+                        commandFeedBack = Command.STOPMOTORS.ToString();
+                        break;
+
+                    case Command.WAIT:
+                        myFinch.wait(waitMilliSeconds);
+                        commandFeedBack = Command.WAIT.ToString();
+                        break;
+
+                    case Command.TURNRIGHT:
+                        myFinch.setMotors(TURNING_MOTOR_SPEED, -TURNING_MOTOR_SPEED);
+                        commandFeedBack = Command.TURNRIGHT.ToString();
+                        break;
+
+                    case Command.TURNLEFT:
+                        myFinch.setMotors(-TURNING_MOTOR_SPEED, TURNING_MOTOR_SPEED);
+                        commandFeedBack = Command.TURNLEFT.ToString();
+                        break;
+
+                    case Command.LEDON:
+                        myFinch.setLED(ledRedBrightness, ledGreenBrightness, ledBlueBrightness);
+                        commandFeedBack = Command.LEDON.ToString();
+                        break;
+
+                    case Command.LEDOFF:
+                        myFinch.setLED(0, 0, 0);
+                        commandFeedBack = Command.LEDOFF.ToString();
+                        break;
+
+                    case Command.NOTEON:
+                        myFinch.noteOn(frequency);
+                        commandFeedBack = Command.NOTEON.ToString();
+                        break;
+
+                    case Command.NOTEOFF:
+                        myFinch.noteOff();
+                        commandFeedBack = Command.NOTEOFF.ToString();
+                        break;
+
+                    case Command.GETTEMPERATURE:
+                        double temp = myFinch.getTemperature();
+                        commandFeedBack = $"Temperature :{DataRecorderConvertToFahrenheit(temp).ToString():n1}" + (char)176 + "F";
+                        break;
+
+                    case Command.DONE:
+                        commandFeedBack = Command.DONE.ToString();
+                        break;
+                }
+
+
+                Console.WriteLine($"\t{commandFeedBack}");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("\tUser Programmed Commands Complete");
+            
+            DisplayMenuPrompt("User Programming");
+        }
+
+        /// <summary>
+        /// Displays list of commands the user has entered
+        /// </summary>
+        /// <param name="commands"></param>
+        static void UserProgrammingDisplayFinchCommands(List<Command> commands)
+        {
+            DisplayScreenHeader("Display Commands");
+
+            UserProgrammingDisplayUserCommands(commands);
+
+            DisplayMenuPrompt("User Programming");
+        }
+
+        /// <summary>
+        /// Method add commands entered by user to list
+        /// </summary>
+        /// <param name="commands"></param>
+        static void UserProgrammingDisplayGetFinchCommands(List<Command> commands)
+        {
+            Command command = Command.NONE;
+
+            DisplayScreenHeader("Finch Robot Commands");
+
+            //provide user with list of commands
+            UserProgrammingDisplayCommandList();
+            
+            //user input commands assign to list
+            while(command != Command.DONE)
+            {
+                Console.Write("\tEnter Command:");
+                if(Enum.TryParse(Console.ReadLine().ToUpper(), out command))
+                {
+                    commands.Add(command);
+                }
+                else
+                {
+                    Console.WriteLine("\tPlease enter a command from the provided list.");
+                }
+            }
+            
+            //echo to user commands they entered
+            UserProgrammingDisplayUserCommands(commands);
+
+
+            DisplayMenuPrompt("User Programming");
+        }
+
+        /// <summary>
+        /// Displays commands user has entered
+        /// </summary>
+        /// <param name="commands"></param>
+        static void UserProgrammingDisplayUserCommands(List<Command> commands)
+        {
+            Console.WriteLine();
+            foreach (Command command in commands)
+            {
+                Console.WriteLine($"\t{command.ToString().ToLower()}");
+            }
+        }
+
+        /// <summary>
+        /// Displays list of commands available to user
+        /// </summary>
+        static void UserProgrammingDisplayCommandList()
+        {
+            int commandCount = 1;
+            Console.WriteLine("\tList of Available Commands");
+            Console.WriteLine();
+
+            foreach (string commandName in Enum.GetNames(typeof(Command)))
+            {
+                Console.Write($"\t__{commandName.ToLower()}__");
+                if (commandCount % 3 == 0)
+                    Console.Write("\n");
+                commandCount++;
+            }
+            Console.WriteLine();
+            Console.WriteLine();
+ 
+        }
+
+        /// <summary>
+        /// User sets parameters for speed, led brightness and finch wait time
+        /// </summary>
+        /// <returns></returns>
+        static (
+            int motorSpeed, 
+            int ledRedBrightness, 
+            int ledGreenBrightness, 
+            int ledBlueBrightness,
+            int frequency,
+            double waitSeconds) UserProgrammingDisplayGetCommandParameters()
+        {
+            DisplayScreenHeader("Command Parameters");
+
+            //store command parameters in a tuple
+            (int motorSpeed, int ledRedBrightness, int ledGreenBrightness, int ledBlueBrightness, int frequency, double waitSeconds) commandParameters;
+
+            //reset parameters to zero
+            commandParameters.motorSpeed = 0;
+            commandParameters.ledRedBrightness = 0;
+            commandParameters.ledGreenBrightness = 0;
+            commandParameters.ledBlueBrightness = 0;
+            commandParameters.frequency = 0;
+            commandParameters.waitSeconds = 0;
+
+            //get parameter entry from user
+            commandParameters.motorSpeed = UserProgrammingDisplayGetValidNumber("\tEnter Motor Speed [0-255]:");      
+            commandParameters.ledRedBrightness = UserProgrammingDisplayGetValidNumber("\tEnter Red LED Brightness[0-255]:");
+            commandParameters.ledGreenBrightness = UserProgrammingDisplayGetValidNumber("\tEnter Green LED Brightness[0-255]:");
+            commandParameters.ledBlueBrightness = UserProgrammingDisplayGetValidNumber("\tEnter Blue LED Brightness[0-255]:");
+            commandParameters.frequency = UserProgrammingDisplayGetFrequency("\tEnter frequency in Hz [100-10000]:");
+            commandParameters.waitSeconds = UserProgrammingDisplayGetSeconds("\tEnter Wait time in seconds [max 10]:");
+
+            //display entries back to user
+            UserProgrammingDisplayCommandParameters(commandParameters);
+
+            DisplayMenuPrompt("User Programming");
+
+            return commandParameters;
+        }
+
+        /// <summary>
+        /// get a valid frequency from user
+        /// </summary>
+        /// <param name="display"></param>
+        /// <returns></returns>
+        static int UserProgrammingDisplayGetFrequency(string display)
+        {
+            bool parseSuccess;
+            int userNumber;
+            do
+            {
+                Console.Write(display);
+                parseSuccess = int.TryParse(Console.ReadLine(), out userNumber);
+
+                if (!parseSuccess)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("\tPlease enter a valid number.");
+                    Console.WriteLine();
+                }
+                else if (userNumber > 10000 || userNumber < 10)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("\tPlease enter a number between 10 and 10,000.");
+                    Console.WriteLine();
+                    parseSuccess = false;
+                }
+
+            } while (!parseSuccess);
+
+            return userNumber;
+        }
+
+        /// <summary>
+        /// display user enters for command parameters
+        /// </summary>
+        /// <param name="commandParameters"></param>
+        static void UserProgrammingDisplayCommandParameters((
+            int motorSpeed,
+            int ledRedBrightness, 
+            int ledGreenBrightness, 
+            int ledBlueBrightness,
+            int frequency,
+            double waitSeconds) commandParameters)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"\tMotor speed: {commandParameters.motorSpeed}");
+            Console.WriteLine($"\tRed LED Brightness: {commandParameters.ledRedBrightness}");
+            Console.WriteLine($"\tGreen LED Brightness: {commandParameters.ledGreenBrightness}");
+            Console.WriteLine($"\tBlue LED Brightness: {commandParameters.ledBlueBrightness}");
+            Console.WriteLine($"\tNote Frequency: {commandParameters.frequency}");
+            Console.WriteLine($"\tWait time (seconds): {commandParameters.waitSeconds}");
+        }
+
+        /// <summary>
+        /// get and verify number fom user within range
+        /// </summary>
+        /// <param name="display"></param>
+        /// <returns></returns>
+        private static double UserProgrammingDisplayGetSeconds(string display)
+        {
+            bool parseSuccess;
+            double userNumber;
+            do
+            {
+                Console.Write(display);
+                parseSuccess = double.TryParse(Console.ReadLine(), out userNumber);
+
+                if (!parseSuccess)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("\tPlease enter a valid number.");
+                    Console.WriteLine();
+                }
+                else if (userNumber > 10 || userNumber < 0)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("\tPlease enter a number between 0 and 10.");
+                    Console.WriteLine();
+                    parseSuccess = false;
+                }
+
+            } while (!parseSuccess);
+
+            return userNumber;
+        }
+
+        /// <summary>
+        /// get and verify number fom user within range
+        /// </summary>
+        /// <param name="display"></param>
+        /// <returns></returns>
+        static int UserProgrammingDisplayGetValidNumber(string display)
+        {
+            bool parseSuccess;
+            int userNumber;
+            do
+            {
+                Console.Write(display);
+                parseSuccess = int.TryParse(Console.ReadLine(), out userNumber);
+
+                if (!parseSuccess)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("\tPlease enter a valid number.");
+                    Console.WriteLine();
+                }
+                else if (userNumber > 255 || userNumber < 0)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("\tPlease enter a number between 0 and 255.");
+                    Console.WriteLine();
+                    parseSuccess = false;
+                }
+
+            } while (!parseSuccess);
+            
+            return userNumber;
+        }
+
+
+        #endregion
 
         #region TALENT SHOW
 
@@ -524,7 +1062,10 @@ namespace Project_FinchControl
         /// <param name="dataPointFrequency"></param>
         /// <param name="myFinch"></param>
         /// <returns></returns>
-        static double[] DataRecorderDisplayGetData(int numberOfDataPoints, double dataPointFrequency, Finch myFinch)
+        static double[] DataRecorderDisplayGetData(
+            int numberOfDataPoints, 
+            double dataPointFrequency, 
+            Finch myFinch)
         {
             double[] temperatures = new double[numberOfDataPoints];
           
@@ -734,7 +1275,6 @@ namespace Project_FinchControl
         /// <returns></returns>
         static double LightAlarmDisplaySetMinMaxThresholdValueTemp(string rangeType, Finch myFinch)
         {
-            double minMaxThresholdValueTemp;
             bool parseSuccess;
 
             double fahrenheit = DataRecorderConvertToFahrenheit(myFinch.getTemperature());
@@ -742,7 +1282,7 @@ namespace Project_FinchControl
             Console.WriteLine($"\tCurrent ambient Temperature: {fahrenheit:n1}" + (char)176 + "F");
             Console.WriteLine();
             Console.Write($"\tEnter the {rangeType} threshold temperature value:");
-            parseSuccess = double.TryParse(Console.ReadLine(), out minMaxThresholdValueTemp);
+            parseSuccess = double.TryParse(Console.ReadLine(), out double minMaxThresholdValueTemp);
 
             if (!parseSuccess)
             {
@@ -846,7 +1386,10 @@ namespace Project_FinchControl
         /// <param name="currentTemperatureValue"></param>
         /// <param name="minMaxThresholdValueTemp"></param>
         /// <returns></returns>
-        static bool LightAlarmDisplayMinMaxThresholdVariableTemp(string rangeType, double currentTemperatureValue, double minMaxThresholdValueTemp)
+        static bool LightAlarmDisplayMinMaxThresholdVariableTemp(
+            string rangeType, 
+            double currentTemperatureValue, 
+            double minMaxThresholdValueTemp)
         {
             bool thresholdExceed = false;
             switch (rangeType)
@@ -875,7 +1418,10 @@ namespace Project_FinchControl
         /// <param name="rangeType"></param>
         /// <param name="timeToMonitor"></param>
         /// <returns></returns>
-        static bool LightAlarmDisplayValidDataEntered(string sensorsToMonitor, string rangeType, int timeToMonitor)
+        static bool LightAlarmDisplayValidDataEntered(
+            string sensorsToMonitor, 
+            string rangeType, 
+            int timeToMonitor)
         {
             bool validDataEntries;
  
@@ -917,7 +1463,10 @@ namespace Project_FinchControl
         /// <param name="currentLightSensorValue"></param>
         /// <param name="minMaxThresholdValue"></param>
         /// <returns></returns>
-        static bool LightAlarmDisplaySetMinMaxThresholdVariable(string rangeType, int currentLightSensorValue, double minMaxThresholdValue)
+        static bool LightAlarmDisplaySetMinMaxThresholdVariable(
+            string rangeType, 
+            int currentLightSensorValue, 
+            double minMaxThresholdValue)
 
         {
             bool thresholdExceed = false;
@@ -972,7 +1521,10 @@ namespace Project_FinchControl
         /// </summary>
         /// <param name="rangeType"></param>
         /// <param name="minMaxThresholdValue"></param>
-        static void LightAlarmDisplayThresholdNotExceeded(string rangeType, double minMaxThresholdValue, double minMaxThresholdValueTemp)
+        static void LightAlarmDisplayThresholdNotExceeded(
+            string rangeType, 
+            double minMaxThresholdValue, 
+            double minMaxThresholdValueTemp)
         {
             Console.SetCursorPosition(8, 15);
 
@@ -992,7 +1544,11 @@ namespace Project_FinchControl
         /// <param name="rangeType"></param>
         /// <param name="minMaxThresholdValue"></param>
         /// <param name="currentLightSensorValue"></param>
-        static void LightAlarmDisplayThresholdExceeded(Finch myFinch, string rangeType, double minMaxThreshold, double currentSensorValue)
+        static void LightAlarmDisplayThresholdExceeded(
+            Finch myFinch, 
+            string rangeType, 
+            double minMaxThreshold, 
+            double currentSensorValue)
         {
             //finch robot makes alarm sound
             for (int lightSoundLevel = 0; lightSoundLevel < 255; lightSoundLevel += 10)
@@ -1048,7 +1604,10 @@ namespace Project_FinchControl
         /// </summary>
         /// <param name="secondsElapsed"></param>
         /// <param name="currentLightSensorValue"></param>
-        static void LightAlarmDisplayTimerAndCurrentLightSensor(int secondsElapsed, int currentLightSensorValue, double currentTemperatureValue)
+        static void LightAlarmDisplayTimerAndCurrentLightSensor(
+            int secondsElapsed, 
+            int currentLightSensorValue, 
+            double currentTemperatureValue)
         {
             Console.SetCursorPosition(8, 10);
             Console.WriteLine($"**********   Total seconds elapsed: {secondsElapsed}");
@@ -1458,7 +2017,7 @@ namespace Project_FinchControl
                         break;
 
                     case "e":
-                        DisplayUnderDevelopment();
+                        UserProgrammingDisplayMenuScreen(myFinch);
                         break;
 
                     case "f":
@@ -1479,6 +2038,7 @@ namespace Project_FinchControl
 
             } while (!quitApplication);
         }
+
 
         /// <summary>
         /// *****************************************************************
@@ -1531,12 +2091,7 @@ namespace Project_FinchControl
         /// <summary>
         /// display notification these modules are in development
         /// </summary>
-        static void DisplayUnderDevelopment()
-        {
-            Console.WriteLine();
-            Console.WriteLine("\tThis module is currently in development.");
-            DisplayContinuePrompt();
-        }
+
     }
 }
         #endregion
