@@ -1,8 +1,10 @@
 ﻿using System;
 using System.CodeDom;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Xml.Schema;
 using FinchAPI;
@@ -36,9 +38,9 @@ namespace Project_FinchControl
     // Description: This program will make the Finch
     // robot perform based on user input.             
     // Application Type: Console
-    // Author: Dunckel, John
+    // Author: Dunckel, Johnn
     // Dated Created: 9/30/2020
-    // Last Modified: 10/27/2020
+    // Last Modified: 11/8/2020
     // 
     // **************************************************
 
@@ -49,14 +51,593 @@ namespace Project_FinchControl
         /// first method run when the app starts up
         /// </summary>
         /// <param name="args"></param>
-        static void Main(string[] args)
+        static void Main()
         {
             SetTheme();
-            DisplayWelcomeScreen();
-            DisplayMenuScreen();
-            DisplayClosingScreen();
+            bool access = DisplayLogInScreen();
+            
+            if (access)
+            {
+                //once user has access main screen is granted
+                DisplayWelcomeScreen();
+                DisplayMenuScreen();
+                DisplayClosingScreen();
+            }
+            else
+            {
+                //notify the user they do not have access and exit the program
+                Console.WriteLine("\tSorry you do not have access to this program." );
+                DisplayContinuePrompt();
+            }
+
         }
 
+
+        #region USER LOGIN
+
+        /// <summary>
+        /// login screen for current users
+        /// returns a bool value if login is accepted
+        /// </summary>
+        /// <returns></returns>
+        static bool DisplayLogInScreen()
+        {
+
+            string userResponse;
+            bool access = false;
+            bool validPassCode;
+
+            DisplayScreenHeader("Login or Register");
+
+            //prompt user if they have an account
+            Console.Write("\tDo you have a current myFinch account? (y or n):");
+            userResponse = Console.ReadLine().ToLower();
+
+            if (userResponse == "y")
+            {
+                //current user portal 
+                access = DisplayCurrentUserLogin();
+            }
+            else
+            {
+                //new user portal
+                validPassCode = DisplayNewUserRegister();
+                if (validPassCode)
+                    access = DisplayCurrentUserLogin();
+            }
+
+
+            return access;
+        }
+
+        /// <summary>
+        /// new user registry
+        /// </summary>
+        /// <returns></returns>
+        static bool DisplayNewUserRegister()
+        {
+            //user must enter a passcode for registration
+            bool validPassCode = GetPassCode();
+
+            if (validPassCode)
+            {
+                //user has entered a valid passcode and can now resiter
+                string newUserName;
+                string newUserPassword;
+
+                DisplayScreenHeader("Register");
+
+                Console.Write("\tEnter your user name:");
+                newUserName = Console.ReadLine();
+                Console.Write("\tEnter your password:");
+                newUserPassword = Console.ReadLine();
+
+                WriteNewUserInfo(newUserName, newUserPassword);
+
+                DisplayNewUserWelcome(newUserName, newUserPassword);
+            }
+            else
+            {
+                //user passcode is not correct
+                Console.WriteLine();
+                Console.WriteLine("\tPlease speak to your admin for a passcode.");
+                DisplayContinuePrompt();
+            }
+            return validPassCode;
+        }
+
+        /// <summary>
+        /// let the user know they have entered the system
+        /// </summary>
+        /// <param name="newUserName"></param>
+        /// <param name="newUserPassword"></param>
+        static void DisplayNewUserWelcome(string newUserName, string newUserPassword)
+        {
+            //user has registered for myFinch
+            Console.WriteLine();
+            Console.WriteLine("\tYou entered the following information and it has be saved.");
+            Console.WriteLine();
+            Console.WriteLine($"\tUser name: {newUserName}");
+            Console.WriteLine($"\tPassword: {newUserPassword}");
+            Console.WriteLine();
+            Console.WriteLine("\tPlease reenter your username and password for access. Thank you");
+        }
+
+        /// <summary>
+        /// write new user info to logindata file
+        /// </summary>
+        /// <param name="newUserName"></param>
+        /// <param name="newUserPassword"></param>
+        static void WriteNewUserInfo(string newUserName, string newUserPassword)
+        {
+            string datapath = @"LoginData/LoginData.txt";
+            string newUser = newUserName +"," + newUserPassword;
+
+            //use try-catch to catch file errors
+            try
+            {
+                //writes new user register to file
+                File.AppendAllText(datapath, newUser + "\n");
+            }
+            catch (DirectoryNotFoundException)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to locate the folder for the data file.");
+                DisplayContinuePrompt();
+            }
+            catch (FileNotFoundException)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to locate the data file.");
+                DisplayContinuePrompt();
+            }
+            catch (Exception)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to read the data file.");
+                DisplayContinuePrompt();
+            }
+
+
+        }
+
+        /// <summary>
+        /// user must have a passcode to register for myFinch 
+        /// this will verify from the PassCode file if it is valid
+        /// </summary>
+        /// <returns></returns>
+        static bool GetPassCode()
+        {
+            bool validCode = false;
+            int maxAttempts = 1;
+
+            string dataPath = @"LoginData/PassCode.txt";
+            string[] validPassCode = new string[3];
+
+            try
+            {
+                validPassCode = File.ReadAllLines(dataPath);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to locate the folder for the data file.");
+                DisplayContinuePrompt();
+            }
+            catch (FileNotFoundException)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to locate the data file.");
+                DisplayContinuePrompt();
+            }
+            catch (Exception)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to read the data file.");
+                DisplayContinuePrompt();
+            }
+
+            do
+            {
+                //verify user entered passcode with what is on file
+                Console.Write("\tPlease enter 4 digit pass code:");
+                string userPassCode = Console.ReadLine();
+
+                //user has 3 attempts to enter a passcode
+                int counter = 0;
+                while (counter < validPassCode.Length && validCode == false)
+                {
+                    if (userPassCode == validPassCode[counter])
+                    {
+                        validCode = true;
+                    }
+                    counter++;
+                }
+               
+                maxAttempts++;
+            } while (maxAttempts <= 3 && !validCode) ;
+
+            //user has reached max attempts and will exit the program
+            if (maxAttempts == 4)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tYou have reached your maximum number of attempts");
+                Console.WriteLine();
+            }
+
+
+            return validCode;
+        }
+
+        /// <summary>
+        /// interface for current users
+        /// </summary>
+        static bool DisplayCurrentUserLogin()
+        {
+            string userName;
+            string userPassword;
+            bool validLogin;
+            int attemps = 1;
+            int remaining = 3;
+            do
+            {
+                //get user name and password
+                Console.WriteLine();
+                Console.Write("\tPlease enter your username:");
+                userName = Console.ReadLine();
+                Console.Write("\tPlease enter your password:");
+                userPassword = Console.ReadLine();
+
+                //validate user entries
+                validLogin = ValidateUserLoginData(userName, userPassword);
+                if (!validLogin)
+                {
+                    //if the user has invalid entry notify them
+                    int attemptsLeft = remaining - attemps;
+                    Console.WriteLine();
+                    Console.WriteLine("\tThe username or password you entered is incorrect");
+                    Console.WriteLine($"\tYou have " + attemptsLeft + " attempts remaining.");
+                    Console.WriteLine();
+                }
+                //counter for max user attempts
+                attemps++;
+            } while (!validLogin && attemps < 4);
+
+
+            if (!validLogin)
+            {   //user reached maximum number of attemps
+                Console.WriteLine();
+                Console.WriteLine("\tYou have reached you maximum number of attempts.");
+                Console.WriteLine();
+            }
+            else if (validLogin)
+            {   //login accepted
+                Console.WriteLine();
+                Console.WriteLine("\tLogin accepted.");
+                Console.WriteLine();
+                DisplayContinuePrompt();
+            }
+
+            return validLogin;
+        }
+
+        /// <summary>
+        /// validate user input against current user file
+        /// </summary>
+        /// <param name="userName"></param>
+        /// <param name="userPassword"></param>
+        /// <returns></returns>
+        static bool ValidateUserLoginData(string userName, string userPassword)
+        {
+            bool validLogin = false;
+
+            //list to store current user data
+            List<(string name, string password)> currentUsersLoginInfo = ReadLoginDataFile();
+
+
+            //verify the info user entered against list data
+            foreach ((string name, string password) currentUsers in currentUsersLoginInfo)
+            {
+                if ((currentUsers.name == userName) && (currentUsers.password == userPassword))
+                {   //valid login
+                    validLogin = true;
+                    break;
+                }
+
+            }
+            return validLogin;
+        }
+
+        /// <summary>
+        /// Reads current user log in info text file into a useable list
+        /// </summary>
+        /// <returns>currentUserLoginInfo</returns>
+        static List<(string userName, string userPassword)> ReadLoginDataFile()
+        {
+            string dataPath = @"LoginData/LoginData.txt";
+
+            string[] userLoginDataArray;
+
+            List<(string userName, string userPassword)> currentUserLoginInfo = new List<(string userName, string userPassword)>();
+
+            (string userName, string userPassword) userLoginDataTuple;
+
+
+            //loop to store all user data into a list
+            //try catch to validate file
+            try
+            {
+                userLoginDataArray = File.ReadAllLines(dataPath);
+                foreach (string userLoginData in userLoginDataArray)
+                {
+                    //use split method to separate lists by comma
+                    userLoginDataArray = userLoginData.Split(',');
+
+                    //move from array to a tuple
+                    userLoginDataTuple.userName = userLoginDataArray[0];
+                    userLoginDataTuple.userPassword = userLoginDataArray[1];
+
+                    //add to list from the tuple
+                    currentUserLoginInfo.Add(userLoginDataTuple);
+                }
+            }
+            catch (DirectoryNotFoundException)
+            {
+                Console.WriteLine("\tUnable to locate the folder for the data file.");
+                DisplayContinuePrompt();
+            }
+            catch (FileNotFoundException)
+            {
+                Console.WriteLine("\tUnable to locate the data file.");
+                DisplayContinuePrompt();
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("\tUnable to read the data file.");
+                DisplayContinuePrompt();
+            }
+
+            return currentUserLoginInfo;
+
+        }
+
+        /// <summary>
+        /// Admin access to add users and passcodes
+        /// </summary>
+        static void DisplayFinchAdministration()
+        {
+            bool quitApplication = false;
+            string menuChoice;
+
+            do
+            {
+                //finch administration main screen
+                DisplayScreenHeader("Welcome to Administration");
+
+                Console.WriteLine("\ta) Add myFinch Users");
+                Console.WriteLine("\tb) Look Up User(s)");
+                Console.WriteLine("\tq) Quit");
+                Console.Write("\t\tEnter Choice:");
+                menuChoice = Console.ReadLine().ToLower();
+
+                switch (menuChoice)
+                {
+                    //user has chosen to add finch users
+                    case "a":
+                        DisplayAddFinchUsers();
+                        break;
+
+                    //user has chosen to view current registered users
+                    case "b":
+                        DisplayCurrentFinchUsers();
+                        break;
+
+                    case "q":
+                        quitApplication = true;
+                        break;
+
+                    default:
+                        Console.WriteLine();
+                        Console.WriteLine("\tPlease enter a letter from the menu choice.");
+                        DisplayContinuePrompt();
+                        break;
+                }
+            } while (!quitApplication);
+
+        }
+
+        /// <summary>
+        /// display current usres with myFinch access
+        /// </summary>
+        static void DisplayCurrentFinchUsers()
+        {
+            string dataPath = @"LoginData/LoginData.txt";
+
+            Console.WriteLine("\tCurrent myFinch users:");
+            //use try-catch to catch file errors
+            try
+            {
+                //reads file into an array and display for user
+                string [] userNameInfo = File.ReadAllLines(dataPath);
+                for (int counter = 0; counter < userNameInfo.Length; counter++)
+                {
+
+                    Console.WriteLine("\t" + userNameInfo[counter]);
+                }
+            }
+            catch (DirectoryNotFoundException)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to locate the folder for the data file.");
+                DisplayContinuePrompt();
+            }
+            catch (FileNotFoundException)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to locate the data file.");
+                DisplayContinuePrompt();
+            }
+            catch (Exception)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to read the data file.");
+                DisplayContinuePrompt();
+            }
+
+            
+
+
+
+            DisplayContinuePrompt();
+        }
+
+        /// <summary>
+        /// allows admin to add new users to myFinch control
+        /// </summary>
+        static void DisplayAddFinchUsers()
+        {
+            DisplayScreenHeader("Add New User(s)");
+
+            //calls method to get numberof new user entries from admin
+            int newUserCount = GetNumberOfUsers();
+
+            string[] newUserArray = new string[newUserCount];
+
+            int counter = 0;
+            while (counter < newUserCount)
+            {
+                //loads added users into an array
+                string newUserNameAndPassword = GetNewUserNameAndPassword();
+                newUserArray[counter] = newUserNameAndPassword;
+                counter++;
+            }
+
+            //displays to admin what they entered
+            DisplayNewUserEntryForUser(newUserArray);
+
+            //prompts and saves new users
+            DisplayAskAdminToSaveNewEntries(newUserArray);
+
+            DisplayContinuePrompt();
+        }
+
+        /// <summary>
+        /// prompt user to save new entries
+        /// </summary>
+        /// <param name="newUserArray"></param>
+        static void DisplayAskAdminToSaveNewEntries(string[] newUserArray)
+        {
+            //prompt admin to save before writing to file
+            Console.WriteLine();
+            Console.Write("\tDo you wish to save the new users? [y or n]");
+            string writeNewUsers = Console.ReadLine().ToLower();
+
+            //calls write method passing new array 
+            if (writeNewUsers == "y")
+                WriteNewUserInfoArray(newUserArray);
+            else
+            {
+                //if answer is no new users not saved
+                Console.WriteLine();
+                Console.WriteLine("\tNo users saved");
+            }
+
+        }
+
+        /// <summary>
+        /// saves new users to LoginData file
+        /// </summary>
+        /// <param name="newUserArray"></param>
+        static void WriteNewUserInfoArray(string[] newUserArray)
+        {
+            string datapath = @"LoginData/LoginData.txt";
+
+            //use try-catch to catch file errors
+            try
+            {
+                //writes all newly entered users from array to file
+                File.AppendAllLines(datapath, newUserArray);
+            }
+            catch (DirectoryNotFoundException)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to locate the folder for the data file.");
+                DisplayContinuePrompt();
+            }
+            catch (FileNotFoundException)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to locate the data file.");
+                DisplayContinuePrompt();
+            }
+            catch (Exception)
+            {
+                Console.WriteLine();
+                Console.WriteLine("\tUnable to read the data file.");
+                DisplayContinuePrompt();
+            }
+            Console.WriteLine("\tNew users have been saved.");
+
+        }
+
+        /// <summary>
+        /// echo user entries
+        /// </summary>
+        /// <param name="newUserArray"></param>
+        static void DisplayNewUserEntryForUser(string[] newUserArray)
+        {
+            //echoes to admin what they entered
+            Console.WriteLine();
+            Console.WriteLine("\tYou entered:");
+            Console.WriteLine("\tUsername, Password:");
+            Console.WriteLine();
+            
+            foreach (string user in newUserArray)
+                Console.WriteLine("\t" + user);
+        }
+
+        /// <summary>
+        /// get new user name and password from user
+        /// </summary>
+        /// <returns></returns>
+        static string GetNewUserNameAndPassword()
+        {
+            //gets users name and password from admin 
+            Console.WriteLine();
+            Console.Write("\tNew Username: ");
+            string newUserName = Console.ReadLine();
+            Console.Write("\tNew User Password: ");
+            string newUserPassWord = Console.ReadLine();
+            string newUserNameAndPassword = newUserName + "," + newUserPassWord;
+
+            return newUserNameAndPassword;
+
+        }
+
+        /// <summary>
+        /// get number of new users from admin
+        /// </summary>
+        /// <returns>int newUserCount</returns>
+        static int GetNumberOfUsers()
+        {
+            int newUserCount;
+            bool parseSuccess;
+            do
+            {
+                //prompts admin for how many new users they want to enter
+  
+                Console.Write("\tHow many users do you wish to add:");
+                parseSuccess = Int32.TryParse(Console.ReadLine(), out newUserCount);
+                if (!parseSuccess)
+                {
+                    Console.WriteLine("\tPlease enter a number!");
+                }
+
+            } while (!parseSuccess);
+            return newUserCount;
+        }
+
+        #endregion
 
         #region USER PROGRAMMING
 
@@ -472,10 +1053,10 @@ namespace Project_FinchControl
                     Console.WriteLine("\tPlease enter a valid number.");
                     Console.WriteLine();
                 }
-                else if (userNumber > 10000 || userNumber < 10)
+                else if (userNumber > 10000 || userNumber < 100)
                 {
                     Console.WriteLine();
-                    Console.WriteLine("\tPlease enter a number between 10 and 10,000.");
+                    Console.WriteLine("\tPlease enter a number between 100 and 10,000.");
                     Console.WriteLine();
                     parseSuccess = false;
                 }
@@ -1991,6 +2572,7 @@ namespace Project_FinchControl
                 Console.WriteLine("\td) Alarm System");
                 Console.WriteLine("\te) User Programming");
                 Console.WriteLine("\tf) Disconnect Finch Robot");
+                Console.WriteLine("\tg) Admin");
                 Console.WriteLine("\tq) Quit");
                 Console.Write("\t\tEnter Choice:");
                 menuChoice = Console.ReadLine().ToLower();
@@ -2023,6 +2605,9 @@ namespace Project_FinchControl
                     case "f":
                         DisplayDisconnectFinchRobot(myFinch);
                         break;
+                    case "g":
+                        DisplayFinchAdministration();
+                        break;
 
                     case "q":
                         DisplayDisconnectFinchRobot(myFinch);
@@ -2038,7 +2623,6 @@ namespace Project_FinchControl
 
             } while (!quitApplication);
         }
-
 
         /// <summary>
         /// *****************************************************************
